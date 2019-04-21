@@ -25,11 +25,15 @@ class Home extends Component {
   };
 
   componentDidMount() {
-    this.setState({ loading: true });
-    const endpoint = `${API_URL}movie/popular?api_key=${API_KEY}&language=en-US&page=1`;
-    this.fetchItems(endpoint);
+    if (sessionStorage.getItem('HomeState')) {
+      let state = JSON.parse(sessionStorage.getItem('HomeState'));
+      this.setState({ ...state });
+    } else {
+      this.setState({ loading: true });
+      const endpoint = `${API_URL}movie/popular?api_key=${API_KEY}&language=en-US&page=1`;
+      this.fetchItems(endpoint);
+    }
   }
-
   searchItems = searchTerm => {
     console.log(searchTerm);
     let endpoint = '';
@@ -63,16 +67,27 @@ class Home extends Component {
   };
 
   fetchItems = endpoint => {
+    // ES6 Destructuring the state
+    const { movies, heroImage, searchTerm } = this.state;
+
     fetch(endpoint)
       .then(result => result.json())
       .then(result => {
-        this.setState({
-          movies: [...this.state.movies, ...result.results],
-          heroImage: this.state.heroImage || result.results[0],
-          loading: false,
-          currentPage: result.page,
-          totalPages: result.total_pages
-        });
+        this.setState(
+          {
+            movies: [...movies, ...result.results],
+            heroImage: heroImage || result.results[0],
+            loading: false,
+            currentPage: result.page,
+            totalPages: result.total_pages
+          },
+          () => {
+            // Remember state for the next mount if we´re not in a search view
+            if (searchTerm === '') {
+              sessionStorage.setItem('HomeState', JSON.stringify(this.state));
+            }
+          }
+        );
       })
       .catch(error => console.error('Error:', error));
   };

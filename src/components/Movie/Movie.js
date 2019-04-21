@@ -3,7 +3,7 @@ import { API_URL, API_KEY } from '../../config';
 import Navigation from '../elements/Navigation/Navigation';
 import MovieInfo from '../elements/MovieInfo/MovieInfo';
 import MovieInfoBar from '../elements/MovieInfoBar/MovieInfoBar';
-import FourColGrid from '../elements/FourColGrid/FourColGrid';
+import FourColGrid from '../elements/FourColGrid/FourColGrid.js';
 import Actor from '../elements/Actor/Actor';
 import Spinner from '../elements/Spinner/Spinner';
 import './Movie.css';
@@ -17,27 +17,34 @@ class Movie extends Component {
   };
 
   componentDidMount() {
-    this.setState({ loading: true });
-    // First fetch the movie ...
-    const endpoint = `${API_URL}movie/${
-      this.props.match.params.movieId
-    }?api_key=${API_KEY}&language=en-US`;
-    this.fetchItems(endpoint);
+    // ES6 destructuring the props
+    const { movieId } = this.props.match.params;
+
+    if (localStorage.getItem(`${movieId}`)) {
+      let state = JSON.parse(localStorage.getItem(`${movieId}`));
+      this.setState({ ...state });
+    } else {
+      this.setState({ loading: true });
+      // First fetch the movie ...
+      let endpoint = `${API_URL}movie/${movieId}?api_key=${API_KEY}&language=en-US`;
+      this.fetchItems(endpoint);
+    }
   }
 
   fetchItems = endpoint => {
+    // ES6 destructuring the props
+    const { movieId } = this.props.match.params;
+
     fetch(endpoint)
       .then(result => result.json())
       .then(result => {
-        console.log(result);
         if (result.status_code) {
+          // If we don't find any movie
           this.setState({ loading: false });
         } else {
           this.setState({ movie: result }, () => {
             // ... then fetch actors in the setState callback function
-            const endpoint = `${API_URL}movie/${
-              this.props.match.params.movieId
-            }/credits?api_key=${API_KEY}`;
+            let endpoint = `${API_URL}movie/${movieId}/credits?api_key=${API_KEY}`;
             fetch(endpoint)
               .then(result => result.json())
               .then(result => {
@@ -45,11 +52,19 @@ class Movie extends Component {
                   member => member.job === 'Director'
                 );
 
-                this.setState({
-                  actors: result.cast,
-                  directors,
-                  loading: false
-                });
+                this.setState(
+                  {
+                    actors: result.cast,
+                    directors,
+                    loading: false
+                  },
+                  () => {
+                    localStorage.setItem(
+                      `${movieId}`,
+                      JSON.stringify(this.state)
+                    );
+                  }
+                );
               });
           });
         }
@@ -58,28 +73,36 @@ class Movie extends Component {
   };
 
   render() {
+    // ES6 Destructuring the props and state
+    const { movieName } = this.props.location;
+    const { movie, directors, actors, loading } = this.state;
+
     return (
-      <div className="rmdb-movie">
-        {this.state.movie ?
+      <div className='rmdb-movie'>
+        {movie ? (
           <div>
-            <Navigation movie={this.props.location.movieName} />
-            <MovieInfo movie={this.state.movie} directors={this.state.directors} />
-            <MovieInfoBar time={this.state.movie.runtime} budget={this.state.movie.budget} revenue={this.state.movie.revenue} />
+            <Navigation movie={movieName} />
+            <MovieInfo movie={movie} directors={directors} />
+            <MovieInfoBar
+              time={movie.runtime}
+              budget={movie.budget}
+              revenue={movie.revenue}
+            />
           </div>
-          : null}
-        {this.state.actors ?
-          <div className="rmdb-movie-grid">
+        ) : null}
+        {actors ? (
+          <div className='rmdb-movie-grid'>
             <FourColGrid header={'Actors'}>
-              {this.state.actors.map((element, i) => {
-                return <Actor key={i} actor={element} />
-              })}
-            </FourColGrid >
+              {actors.map((element, i) => (
+                <Actor key={i} actor={element} />
+              ))}
+            </FourColGrid>
           </div>
-          : null}
-        {!this.state.actors && !this.state.loading ? <h1>No Movie Found!</h1> : null}
-        {this.state.loading ? <Spinner /> : null}
+        ) : null}
+        {!actors && !loading ? <h1>No movie found</h1> : null}
+        {loading ? <Spinner /> : null}
       </div>
-    )
+    );
   }
 }
 
